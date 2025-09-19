@@ -138,6 +138,18 @@ void getCraftingOutput (PlayerData *player, uint8_t *count, uint16_t *item) {
             *count = 1;
             return;
           }
+          // Bucket recipe
+          if (
+            (
+              first_row != 2 && first_col == 0 &&
+              player->craft_items[first + 2] == I_iron_ingot &&
+              player->craft_items[first + 4] == I_iron_ingot
+            )
+          ) {
+            *item = I_bucket;
+            *count = 1;
+            return;
+          }
           break;
 
         default: break;

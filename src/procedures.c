@@ -1286,6 +1286,44 @@ void handlePlayerUseItem (PlayerData *player, short x, short y, short z, uint8_t
         if ((fast_rand() & 3) == 0) placeTreeStructure(x, y, z);
       }
     }
+  } else if (*item == I_bucket) {
+    if (face == 255) return;
+
+    switch (face) {
+      case 0: y -= 1; break;
+      case 1: y += 1; break;
+      case 2: z -= 1; break;
+      case 3: z += 1; break;
+      case 4: x -= 1; break;
+      case 5: x += 1; break;
+      default: break;
+    }
+
+    target = getBlockAt(x, y, z);
+
+    // Get the bucket equivalent of the block, or return if there isn't anything
+    switch (target) {
+      case B_water:
+        *item = I_water_bucket;
+        break;
+      case B_lava:
+        *item = I_lava_bucket;
+        break;
+      default: return;
+    }
+
+    if (makeBlockChange(x, y, z, B_air)) return;
+
+    #ifdef DO_FLUID_FLOW
+    checkFluidUpdate(x, y + 1, z, getBlockAt(x, y + 1, z));
+    checkFluidUpdate(x - 1, y, z, getBlockAt(x - 1, y, z));
+    checkFluidUpdate(x + 1, y, z, getBlockAt(x + 1, y, z));
+    checkFluidUpdate(x, y, z - 1, getBlockAt(x, y, z - 1));
+    checkFluidUpdate(x, y, z + 1, getBlockAt(x, y, z + 1));
+    #endif
+
+    sc_setContainerSlot(player->client_fd, 0, serverSlotToClientSlot(0, player->hotbar), *count, *item);
+    return;
   } else if (handlePlayerEating(player, true)) {
     // Reset eating timer and set eating flag
     player->flagval_16 = 0;
@@ -1310,8 +1348,22 @@ void handlePlayerUseItem (PlayerData *player, short x, short y, short z, uint8_t
   // Don't proceed with block placement if no coordinates were provided
   if (face == 255) return;
 
+  uint8_t block;
+  uint8_t is_bucket = false;
+
+  switch (*item) {
+    case I_water_bucket:
+      block = B_water;
+      is_bucket = true;
+      break;
+    case I_lava_bucket:
+      block = B_lava;
+      is_bucket = true;
+      break;
+    default: block = I_to_B(*item);
+  }
+
   // If the selected item doesn't correspond to a block, exit
-  uint8_t block = I_to_B(*item);
   if (block == 0) return;
 
   switch (face) {
@@ -1337,17 +1389,27 @@ void handlePlayerUseItem (PlayerData *player, short x, short y, short z, uint8_t
   ) {
     // Apply server-side block change
     if (makeBlockChange(x, y, z, block)) return;
-    // Decrease item amount in selected slot
-    *count -= 1;
-    // Clear item id in slot if amount is zero
-    if (*count == 0) *item = 0;
+
+    if (is_bucket) {
+      *item = I_bucket;
+    } else {
+      // Decrease item amount in selected slot
+      *count -= 1;
+      // Clear item id in slot if amount is zero
+      if (*count == 0) *item = 0;
+    }
+
     // Calculate fluid flow
     #ifdef DO_FLUID_FLOW
-      checkFluidUpdate(x, y + 1, z, getBlockAt(x, y + 1, z));
-      checkFluidUpdate(x - 1, y, z, getBlockAt(x - 1, y, z));
-      checkFluidUpdate(x + 1, y, z, getBlockAt(x + 1, y, z));
-      checkFluidUpdate(x, y, z - 1, getBlockAt(x, y, z - 1));
-      checkFluidUpdate(x, y, z + 1, getBlockAt(x, y, z + 1));
+      if (is_bucket) {
+        checkFluidUpdate(x, y, z, getBlockAt(x, y, z));
+      } else {
+        checkFluidUpdate(x, y + 1, z, getBlockAt(x, y + 1, z));
+        checkFluidUpdate(x - 1, y, z, getBlockAt(x - 1, y, z));
+        checkFluidUpdate(x + 1, y, z, getBlockAt(x + 1, y, z));
+        checkFluidUpdate(x, y, z - 1, getBlockAt(x, y, z - 1));
+        checkFluidUpdate(x, y, z + 1, getBlockAt(x, y, z + 1));
+      }
     #endif
   }
 
